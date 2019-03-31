@@ -2,6 +2,8 @@
 // Licensed under the MIT License.
 
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Text;
 
 namespace Microsoft.PowerShell.Commands
 {
@@ -27,85 +29,72 @@ namespace Microsoft.PowerShell.Commands
         /// String to be parsed.
         /// </param>
         internal Collection<string> ParseCsv(string csv)
-        {
-            Collection<string> result = new Collection<string>();
-            string tempString = string.Empty;
+        {        
             csv = csv.Trim();
+            Collection<string> result = new Collection<string>();
             if (csv.Length == 0 || csv[0] == '#')
             {
                 return result;
             }
 
-            bool inQuote = false;
-            for (int i = 0; i < csv.Length; i++)
+            var reader = new StringReader(csv);
+            StringBuilder wordBuffer = new StringBuilder();
+
+            while (reader.Peek() != -1) 
             {
-                char c = csv[i];
-                if (c == Delimiter)
+                char nextChar = (char)reader.Read();
+
+                // if next character was delimiter or we are at the end, add string to result and clear wordBuffer
+                // else if next character was quote, perform reading until next quote and add it to wordBuffer
+                // else read and add it to wordBuffer
+                if (nextChar == Delimiter) 
                 {
-                    if (!inQuote)
-                    {
-                        result.Add(tempString);
-                        tempString = string.Empty;
-                    }
-                    else
-                    {
-                        tempString += c;
-                    }
-                }
-                else
+                    result.Add(wordBuffer.ToString());
+                    wordBuffer.Clear();
+                } 
+                else if (nextChar == '"') 
                 {
-                    switch (c)
+                    bool inQuotes = true;
+                    
+                    // if we are within a quote section, read and append to wordBuffer until we find a next quote that is not followed by another quote
+                    // if it is a single quote, escape the quote section
+                    // if the quote is followed by an other quote, do not escape and add a quote character to wordBuffer
+                    while (reader.Peek() != -1 && inQuotes) 
                     {
-                        case '"':
-                            if (inQuote)
+                        nextChar = (char)reader.Read();
+                        
+                        if (nextChar == '"') 
+                        {
+                            if ((char)reader.Peek() == '"')
                             {
-                                // If we are at the end of the string or the end of the segment, create a new value
-                                // Otherwise we have an error
-                                if (i == csv.Length - 1)
-                                {
-                                    result.Add(tempString);
-                                    tempString = string.Empty;
-                                    inQuote = false;
-                                    break;
-                                }
-
-                                if (csv[i + 1] == Delimiter)
-                                {
-                                    result.Add(tempString);
-                                    tempString = string.Empty;
-                                    inQuote = false;
-                                    i++;
-                                }
-                                else if (csv[i + 1] == '"')
-                                {
-                                    tempString += '"';
-                                    i++;
-                                }
-                                else
-                                {
-                                    inQuote = false;
-                                }
-                            }
-                            else
+                                wordBuffer.Append(nextChar);
+                                reader.Read();
+                            } 
+                            else 
                             {
-                                inQuote = true;
+                                inQuotes = false;
                             }
-
-                            break;
-
-                        default:
-                            tempString += c;
-                            break;
+                        } 
+                        else 
+                        {
+                            wordBuffer.Append(nextChar);
+                        }
                     }
+                } 
+                else 
+                {
+                    wordBuffer.Append(nextChar);
                 }
             }
 
-            if (tempString.Length > 0)
+            string lastWord = wordBuffer.ToString();
+            if (lastWord != string.Empty)
             {
-                result.Add(tempString);
+                result.Add(lastWord);
             }
 
-            return result;
+            reader.Close();    
+            return result;           
         }
     }
 }
