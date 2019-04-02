@@ -291,97 +291,168 @@ namespace Microsoft.PowerShell.Commands
         {
             Collection<AliasInfo> result = new Collection<AliasInfo>();
 
-            string filePath = null;
-            using (StreamReader reader = OpenFile(out filePath, isLiteralPath))
+            // it seems like filePath is always null and never defined, so we can remove it as far as I could see
+            // string filePath = null;
+
+            using (StreamReader reader = OpenFile(isLiteralPath))
             {
                 //CSVHelper csvHelper = new CSVHelper(',');
 
                 Int64 lineNumber = 0;
-                string line = null;
+                string line;// = null;
                 while ((line = reader.ReadLine()) != null)
                 {
                     ++lineNumber;
 
-                    // Ignore blank lines
-                    if (line.Length == 0) 
-                    {
+                    if(lineShouldBeSkipped(line)) {
                         continue;
                     }
 
-                    // Ignore lines that only contain whitespace
-                    if (OnlyContainsWhitespace(line))
-                    {
-                        continue;
+                    Collection<string> parsedLine = ParseCsvLine(line);
+
+                    // create options
+                    ScopedItemOptions options = createItemOptions(parsedLine, null, lineNumber);
+
+                    if(isValidParsedLine(parsedLine, options, lineNumber)) {
+                        result.Add(constructAlias(parsedLine, options));
                     }
+                    ////
 
-                    // Ignore comment lines
-                    if (line[0] == '#')
-                    {
-                        continue;
-                    }
+                //     if (parsedLine.Count != 4)
+                //     {
+                //         string message = StringUtil.Format(AliasCommandStrings.ImportAliasFileInvalidFormat, filePath, lineNumber);
 
-                    Collection<string> values = ParseCsvLine(line);
+                //         FormatException formatException =
+                //             new FormatException(message);
 
-                    if (values.Count != 4)
-                    {
-                        string message = StringUtil.Format(AliasCommandStrings.ImportAliasFileInvalidFormat, filePath, lineNumber);
+                //         ErrorRecord errorRecord =
+                //             new ErrorRecord(
+                //                 formatException,
+                //                 "ImportAliasFileFormatError",
+                //                 ErrorCategory.ReadError,
+                //                 filePath);
 
-                        FormatException formatException =
-                            new FormatException(message);
+                //         errorRecord.ErrorDetails = new ErrorDetails(message);
 
-                        ErrorRecord errorRecord =
-                            new ErrorRecord(
-                                formatException,
-                                "ImportAliasFileFormatError",
-                                ErrorCategory.ReadError,
-                                filePath);
+                //         ThrowTerminatingError(errorRecord);
+                //     }
 
-                        errorRecord.ErrorDetails = new ErrorDetails(message);
+                //     ScopedItemOptions options = ScopedItemOptions.None;
 
-                        ThrowTerminatingError(errorRecord);
-                    }
+                //     try
+                //     {
+                //         options = (ScopedItemOptions)Enum.Parse(typeof(ScopedItemOptions), values[3], true);
+                //     }
+                //     catch (ArgumentException argException)
+                //     {
+                //         string message = StringUtil.Format(AliasCommandStrings.ImportAliasOptionsError, filePath, lineNumber);
 
-                    ScopedItemOptions options = ScopedItemOptions.None;
+                //         ErrorRecord errorRecord =
+                //             new ErrorRecord(
+                //                 argException,
+                //                 "ImportAliasOptionsError",
+                //                 ErrorCategory.ReadError,
+                //                 filePath);
 
-                    try
-                    {
-                        options = (ScopedItemOptions)Enum.Parse(typeof(ScopedItemOptions), values[3], true);
-                    }
-                    catch (ArgumentException argException)
-                    {
-                        string message = StringUtil.Format(AliasCommandStrings.ImportAliasOptionsError, filePath, lineNumber);
+                //         errorRecord.ErrorDetails = new ErrorDetails(message);
+                //         WriteError(errorRecord);
+                //         continue;
+                //     }
 
-                        ErrorRecord errorRecord =
-                            new ErrorRecord(
-                                argException,
-                                "ImportAliasOptionsError",
-                                ErrorCategory.ReadError,
-                                filePath);
+                //     AliasInfo newAlias =
+                //         new AliasInfo(
+                //             values[0],
+                //             values[1],
+                //             Context,
+                //             options);
 
-                        errorRecord.ErrorDetails = new ErrorDetails(message);
-                        WriteError(errorRecord);
-                        continue;
-                    }
+                //     if (!string.IsNullOrEmpty(values[2]))
+                //     {
+                //         newAlias.Description = values[2];
+                //     }
 
-                    AliasInfo newAlias =
+                //     result.Add(newAlias);
+                // }
+                }
+                reader.Dispose();
+            }
+            return result;
+        }
+
+        private bool lineShouldBeSkipped(string line)
+        {
+            //if line is empty or a comment, return true
+            return line.Length == 0 || OnlyContainsWhitespace(line) || line[0] == '#';
+        }
+
+        private ScopedItemOptions createItemOptions(Collection<string> parsedLine, string filePath, Int64 lineNumber) {
+            ScopedItemOptions options = ScopedItemOptions.None;
+
+            try
+            {
+                options = (ScopedItemOptions)Enum.Parse(typeof(ScopedItemOptions), parsedLine[3], true);
+            }
+            catch (ArgumentException argException)
+            {
+                string message = StringUtil.Format(AliasCommandStrings.ImportAliasOptionsError, filePath, lineNumber);
+
+                ErrorRecord errorRecord =
+                    new ErrorRecord(
+                        argException,
+                        "ImportAliasOptionsError",
+                        ErrorCategory.ReadError,
+                        filePath);
+
+                errorRecord.ErrorDetails = new ErrorDetails(message);
+                WriteError(errorRecord);
+            }
+            return options;
+        }
+
+        private AliasInfo constructAlias(Collection<string> parsedLine, ScopedItemOptions options) {
+            AliasInfo newAlias =
                         new AliasInfo(
-                            values[0],
-                            values[1],
+                            parsedLine[0],
+                            parsedLine[1],
                             Context,
                             options);
 
-                    if (!string.IsNullOrEmpty(values[2]))
-                    {
-                        newAlias.Description = values[2];
-                    }
-
-                    result.Add(newAlias);
-                }
-
-                reader.Dispose();
+            if (!string.IsNullOrEmpty(parsedLine[2]))
+            {
+                newAlias.Description = parsedLine[2];
             }
-            //return null;
-            return result;
+
+            return newAlias;
+        }
+
+        private bool isValidParsedLine(Collection<string> parsedLine, ScopedItemOptions options, Int64 lineNumber) {
+            // if options object cannot be created
+            if(options == ScopedItemOptions.None) {              
+                return false;
+            }
+
+            if(parsedLine.Count != 4)
+            {
+                // if not four values, do ThrowTerminatingError(errorRecord) with ImportAliasFileFormatError, just like old implementation
+                string message = StringUtil.Format(AliasCommandStrings.ImportAliasFileInvalidFormat, lineNumber);
+
+                FormatException formatException =
+                    new FormatException(message);
+
+                ErrorRecord errorRecord =
+                    new ErrorRecord(
+                        formatException,
+                        "ImportAliasFileFormatError",
+                        ErrorCategory.ReadError,
+                        null);
+
+                errorRecord.ErrorDetails = new ErrorDetails(message);
+
+                ThrowTerminatingError(errorRecord);
+                return false;
+            }
+
+            return true;
         }
 
         private Collection<string> ParseCsvLine(string csv)
@@ -453,11 +524,11 @@ namespace Microsoft.PowerShell.Commands
             return result;           
         }
 
-        private StreamReader OpenFile(out string filePath, bool isLiteralPath)
+        private StreamReader OpenFile(bool isLiteralPath)
         {
             StreamReader result = null;
 
-            filePath = null;
+            //filePath = null;
             ProviderInfo provider = null;
             Collection<string> paths = null;
 
@@ -492,7 +563,7 @@ namespace Microsoft.PowerShell.Commands
                         this.Path);
             }
 
-            filePath = paths[0];
+            string filePath = paths[0];
 
             try
             {
