@@ -49,7 +49,7 @@ jobs:
       source: ${{ steps.filter.outputs.source }}
     steps:
       - name: checkout
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@v4.2.2
 
         # For pull requests it's not necessary to checkout the code
       - uses: dorny/paths-filter@v3
@@ -76,7 +76,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 1000
       - name: Build
@@ -90,7 +90,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 1000
       - name: Windows Unelevated CI
@@ -107,7 +107,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 1000
       - name: Windows Elevated CI
@@ -124,7 +124,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 1000
       - name: Windows Unelevated Others
@@ -141,7 +141,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 1000
       - name: Windows Elevated Others
@@ -158,7 +158,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: checkout
-        uses: actions/checkout@v4.1.0
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 1000
       - name: Verify xUnit test results
